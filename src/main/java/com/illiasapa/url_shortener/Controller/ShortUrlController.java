@@ -1,5 +1,6 @@
 package com.illiasapa.url_shortener.Controller;
 
+import com.illiasapa.url_shortener.Dto.AnalyticsFull;
 import com.illiasapa.url_shortener.Dto.ClickAnalyticResponse;
 import com.illiasapa.url_shortener.Dto.CreateUrlRequest;
 import com.illiasapa.url_shortener.Dto.CreateUrlRequestDto;
@@ -33,7 +34,7 @@ public class ShortUrlController {
     }
 
     @GetMapping("/api/urls/{shortCode}/analytics")
-    public List<ClickAnalyticResponse> getAnalytics(@PathVariable String shortCode){
+    public AnalyticsFull getAnalytics(@PathVariable String shortCode){
         return shortUrlService.getAnalytics(shortCode);
     }
 }

@@ -1,5 +1,6 @@
 package com.illiasapa.url_shortener.Service;
 
+import com.illiasapa.url_shortener.Dto.AnalyticsFull;
 import com.illiasapa.url_shortener.Dto.ClickAnalyticResponse;
 import com.illiasapa.url_shortener.Dto.CreateUrlRequestDto;
 import com.illiasapa.url_shortener.Entity.ClickEvent;
@@ -79,7 +80,7 @@ public class ShortUrlService {
         return entity.getOriginalUrl();
     }
 
-    public List<ClickAnalyticResponse> getAnalytics(String shortCode){
+    public AnalyticsFull getAnalytics(String shortCode){
 
         ShortUrlEntity entity = shortUrlRepository.findByShortCode(shortCode);
 
@@ -88,6 +89,7 @@ public class ShortUrlService {
         }
 
         List<ClickEvent> list = clickEventRepository.findByShortUrlId(entity.getId());
+        AnalyticsFull analyticsFull = new AnalyticsFull();
 
         if(list.isEmpty()) {
             return null;
@@ -106,6 +108,9 @@ public class ShortUrlService {
             analyticResponses.add(response);
         }
 
-        return analyticResponses;
+        analyticsFull.setList(analyticResponses);
+        analyticsFull.setClickCount(entity.getClickCount());
+
+        return analyticsFull;
     }
 }
