@@ -1,6 +1,7 @@
 package com.illiasapa.url_shortener.Service;
 
 import com.illiasapa.url_shortener.Dto.ClickAnalyticResponse;
+import com.illiasapa.url_shortener.Dto.CreateUrlRequestDto;
 import com.illiasapa.url_shortener.Entity.ClickEvent;
 import com.illiasapa.url_shortener.Entity.ShortUrlEntity;
 import com.illiasapa.url_shortener.Repository.ClickEventRepository;
@@ -34,8 +35,9 @@ public class ShortUrlService {
         this.clickEventRepository = clickEventRepository;
     }
 
-    public String createShortUrl(String originalUrl){
+    public CreateUrlRequestDto createShortUrl(String originalUrl){
         ShortUrlEntity entity = new ShortUrlEntity();
+        CreateUrlRequestDto dto = new CreateUrlRequestDto();
         entity.setOriginalUrl(originalUrl);
         entity.setTimestamp(Instant.now());
         entity.setClickCount(0);
@@ -48,7 +50,9 @@ public class ShortUrlService {
 
         shortUrlRepository.save(entity);
 
-        return baseUrl + "/" + code;
+        dto.setShortUrl(baseUrl + "/" + code);
+
+        return dto;
     }
 
     public String getOriginalUrl(String shortCode, HttpServletRequest request){

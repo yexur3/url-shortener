@@ -2,6 +2,7 @@ package com.illiasapa.url_shortener.Controller;
 
 import com.illiasapa.url_shortener.Dto.ClickAnalyticResponse;
 import com.illiasapa.url_shortener.Dto.CreateUrlRequest;
+import com.illiasapa.url_shortener.Dto.CreateUrlRequestDto;
 import com.illiasapa.url_shortener.Entity.ClickEvent;
 import com.illiasapa.url_shortener.Service.ShortUrlService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -21,7 +22,7 @@ public class ShortUrlController {
     }
 
     @PostMapping("/api/urls")
-    public String createShortUrl(@RequestBody CreateUrlRequest request){
+    public CreateUrlRequestDto createShortUrl(@RequestBody CreateUrlRequest request){
         return shortUrlService.createShortUrl(request.getOriginalUrl());
     }
 
