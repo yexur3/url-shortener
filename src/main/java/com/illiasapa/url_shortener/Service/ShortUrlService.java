@@ -9,6 +9,8 @@ import com.illiasapa.url_shortener.Repository.ClickEventRepository;
 import com.illiasapa.url_shortener.Repository.ShortUrlRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -22,18 +24,21 @@ public class ShortUrlService {
     @Value("${app.base-url}")
     private String baseUrl;
 
-    public final ShortUrlRepository shortUrlRepository;
-    public final ClickEventRepository clickEventRepository;
-    public final Base62Service base62Service;
+    private final ShortUrlRepository shortUrlRepository;
+    private final ClickEventRepository clickEventRepository;
+    private final Base62Service base62Service;
+    private final RedisTemplate<String, String> redisTemplate;
 
     public ShortUrlService(
             ShortUrlRepository shortUrlRepository,
             Base62Service base62Service,
-            ClickEventRepository clickEventRepository
+            ClickEventRepository clickEventRepository,
+            RedisTemplate<String, String> redisTemplate
     ){
         this.shortUrlRepository = shortUrlRepository;
         this.base62Service = base62Service;
         this.clickEventRepository = clickEventRepository;
+        this.redisTemplate = redisTemplate;
     }
 
     public CreateUrlRequestDto createShortUrl(String originalUrl){
@@ -57,27 +62,38 @@ public class ShortUrlService {
     }
 
     public String getOriginalUrl(String shortCode, HttpServletRequest request){
-        ShortUrlEntity entity = shortUrlRepository.findByShortCode(shortCode);
+        String cache = redisTemplate.opsForValue().get(shortCode);
 
+        if(cache != null){
+            logClickAsync(shortCode, request.getRemoteAddr(), request.getHeader("Referer"), request.getHeader("User-Agent"));
+            return cache;
+        }
+
+        ShortUrlEntity entity = shortUrlRepository.findByShortCode(shortCode);
         if(entity == null){
             throw new NoSuchElementException("Short URL not found: " + shortCode);
         }
 
-        ClickEvent clickEvent = new ClickEvent();
+        redisTemplate.opsForValue().set(shortCode, entity.getOriginalUrl());
 
-        entity.setClickCount(entity.getClickCount() + 1);
-        shortUrlRepository.save(entity);
-
-
-        clickEvent.setShortUrlId(entity.getId());
-        clickEvent.setClickedAt(Instant.now());
-        clickEvent.setIpAddress(request.getRemoteAddr());
-        clickEvent.setReferrer(request.getHeader("Referer"));
-        clickEvent.setUserAgent(request.getHeader("User-Agent"));
-
-        clickEventRepository.save(clickEvent);
+        logClickAsync(entity.getShortCode(), request.getRemoteAddr(), request.getHeader("Referer"), request.getHeader("User-Agent"));
 
         return entity.getOriginalUrl();
+    }
+
+    @Async
+    public void logClickAsync(String shortCode, String ip, String referrer, String userAgent){
+        ShortUrlEntity shortUrlEntity = shortUrlRepository.findByShortCode(shortCode);
+        shortUrlEntity.setClickCount(shortUrlEntity.getClickCount() + 1);
+        shortUrlRepository.save(shortUrlEntity);
+
+        ClickEvent clickEvent = new ClickEvent();
+        clickEvent.setShortUrlId(shortUrlEntity.getId());
+        clickEvent.setClickedAt(Instant.now());
+        clickEvent.setIpAddress(ip);
+        clickEvent.setReferrer(referrer);
+        clickEvent.setUserAgent(userAgent);
+        clickEventRepository.save(clickEvent);
     }
 
     public AnalyticsFull getAnalytics(String shortCode){
@@ -91,9 +107,6 @@ public class ShortUrlService {
         List<ClickEvent> list = clickEventRepository.findByShortUrlId(entity.getId());
         AnalyticsFull analyticsFull = new AnalyticsFull();
 
-        if(list.isEmpty()) {
-            return null;
-        }
 
         List<ClickAnalyticResponse> analyticResponses = new ArrayList<>(list.size());
 
