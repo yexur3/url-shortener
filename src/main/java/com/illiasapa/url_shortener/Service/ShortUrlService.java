@@ -28,17 +28,20 @@ public class ShortUrlService {
     private final ClickEventRepository clickEventRepository;
     private final Base62Service base62Service;
     private final RedisTemplate<String, String> redisTemplate;
+    private final ClickLoggingService clickLoggingService;
 
     public ShortUrlService(
             ShortUrlRepository shortUrlRepository,
             Base62Service base62Service,
             ClickEventRepository clickEventRepository,
-            RedisTemplate<String, String> redisTemplate
+            RedisTemplate<String, String> redisTemplate,
+            ClickLoggingService clickLoggingService
     ){
         this.shortUrlRepository = shortUrlRepository;
         this.base62Service = base62Service;
         this.clickEventRepository = clickEventRepository;
         this.redisTemplate = redisTemplate;
+        this.clickLoggingService = clickLoggingService;
     }
 
     public CreateUrlRequestDto createShortUrl(String originalUrl){
@@ -65,7 +68,7 @@ public class ShortUrlService {
         String cache = redisTemplate.opsForValue().get(shortCode);
 
         if(cache != null){
-            logClickAsync(shortCode, request.getRemoteAddr(), request.getHeader("Referer"), request.getHeader("User-Agent"));
+            clickLoggingService.logClickAsync(shortCode, request.getRemoteAddr(), request.getHeader("Referer"), request.getHeader("User-Agent"));
             return cache;
         }
 
@@ -76,24 +79,9 @@ public class ShortUrlService {
 
         redisTemplate.opsForValue().set(shortCode, entity.getOriginalUrl());
 
-        logClickAsync(entity.getShortCode(), request.getRemoteAddr(), request.getHeader("Referer"), request.getHeader("User-Agent"));
+        clickLoggingService.logClickAsync(entity.getShortCode(), request.getRemoteAddr(), request.getHeader("Referer"), request.getHeader("User-Agent"));
 
         return entity.getOriginalUrl();
-    }
-
-    @Async
-    public void logClickAsync(String shortCode, String ip, String referrer, String userAgent){
-        ShortUrlEntity shortUrlEntity = shortUrlRepository.findByShortCode(shortCode);
-        shortUrlEntity.setClickCount(shortUrlEntity.getClickCount() + 1);
-        shortUrlRepository.save(shortUrlEntity);
-
-        ClickEvent clickEvent = new ClickEvent();
-        clickEvent.setShortUrlId(shortUrlEntity.getId());
-        clickEvent.setClickedAt(Instant.now());
-        clickEvent.setIpAddress(ip);
-        clickEvent.setReferrer(referrer);
-        clickEvent.setUserAgent(userAgent);
-        clickEventRepository.save(clickEvent);
     }
 
     public AnalyticsFull getAnalytics(String shortCode){
